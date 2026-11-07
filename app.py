@@ -10,3 +10,4 @@ df = pd.DataFrame({
     'Количество': [1, 2, 3]
 })
 st.dataframe(df)
+st.write("Ура, PyCharm подружился с GitHub!")
