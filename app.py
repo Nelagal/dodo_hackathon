@@ -6,11 +6,12 @@ import os
 import base64
 from openpyxl.styles import Font, Alignment
 
-# Настройки страницы
+# ==========================================
+# НАСТРОЙКИ СТРАНИЦЫ И ФОН
+# ==========================================
 page_icon = "logo.png" if os.path.exists("logo.png") else "🍕"
 st.set_page_config(page_title="Сборка заказа Додо", page_icon=page_icon, layout="wide")
 
-# --- ФУНКЦИЯ ДЛЯ УСТАНОВКИ ФОНА ---
 def add_bg_from_local(image_file):
     if os.path.exists(image_file):
         with open(image_file, "rb") as image:
@@ -36,10 +37,11 @@ def add_bg_from_local(image_file):
             unsafe_allow_html=True
         )
 
-# Вызываем функцию фона
 add_bg_from_local("background.png")
 
-# Создаем две колонки: узкую для логотипа и широкую для заголовка
+# ==========================================
+# ШАПКА С ЛОГОТИПОМ
+# ==========================================
 col_logo, col_title = st.columns([1, 5])
 
 with col_logo:
@@ -53,16 +55,39 @@ with col_title:
 if 'calculated_data' not in st.session_state:
     st.session_state['calculated_data'] = None
 
-# --- ПРИВЕТСТВЕННЫЙ МАСКОТ (ПОКАЗЫВАЕТСЯ, ЕСЛИ НЕТ РАСЧЕТА) ---
+# ==========================================
+# МАСКОТ С ОБЛАЧКОМ (ПОКАЗЫВАЕТСЯ, ЕСЛИ НЕТ РАСЧЕТА)
+# ==========================================
 if st.session_state['calculated_data'] is None:
-    col_mascot1, col_mascot2, col_mascot3 = st.columns([1, 1, 1])
-    with col_mascot2:
-        if os.path.exists("mascot.png"):
-            st.image("mascot.png", use_container_width=True)
-    st.markdown("<h4 style='text-align: center; color: #E8502A;'>Готовы собрать идеальный заказ?</h4>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center;'>Загрузите 7 файлов в блоки ниже, чтобы начать расчет.</p>", unsafe_allow_html=True)
-    st.write("---")
+    if os.path.exists("mascot.png"):
+        with open("mascot.png", "rb") as img_file:
+            img_base64 = base64.b64encode(img_file.read()).decode()
 
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; justify-content: center; gap: 30px; margin-top: 20px; margin-bottom: 40px; flex-wrap: wrap;">
+            <!-- Додозаврик -->
+            <div>
+                <img src="data:image/png;base64,{img_base64}" width="220" style="filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.1));">
+            </div>
+            <!-- Облачко с текстом -->
+            <div style="position: relative; background: #ffffff; border: 3px solid #E8502A; border-radius: 25px; padding: 25px 35px; box-shadow: 0 10px 20px rgba(232, 80, 42, 0.15); max-width: 500px;">
+                <!-- Хвостик облачка -->
+                <div style="position: absolute; left: -17px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 15px solid transparent; border-bottom: 15px solid transparent; border-right: 17px solid #E8502A;"></div>
+                <div style="position: absolute; left: -12px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-right: 14px solid #ffffff;"></div>
+                <!-- Текст -->
+                <h3 style="margin: 0 0 10px 0; color: #E8502A; font-family: sans-serif; font-size: 24px;">Готовы собрать идеальный заказ?</h3>
+                <p style="margin: 0; color: #333333; font-family: sans-serif; font-size: 18px;">Загрузите 7 файлов в блоки ниже, чтобы начать расчет.</p>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.write("---")
+    else:
+        st.markdown("<h4 style='text-align: center; color: #E8502A;'>Готовы собрать идеальный заказ?</h4>", unsafe_allow_html=True)
+        st.write("---")
+
+# ==========================================
+# ЗАГРУЗКА ФАЙЛОВ
+# ==========================================
 st.header("Шаг 1. Загрузка данных")
 col1, col2, col3 = st.columns(3)
 
@@ -83,6 +108,9 @@ with col3:
     file_warehouse = st.file_uploader("Складские остатки (для сверки)", type=["xlsx"],
                                       help="Файл для проверки расхождений и отрицательных остатков")
 
+# ==========================================
+# ЛОГИКА РАСЧЕТА
+# ==========================================
 if st.button("🚀 Рассчитать заказ", type="primary"):
     if not all([file_m1, file_m2, file_m3, file_prc1, file_prc2, file_supplier]):
         st.warning("Пожалуйста, загрузите все основные 6 файлов!")
@@ -128,8 +156,7 @@ if st.button("🚀 Рассчитать заказ", type="primary"):
                     df_wh = df_wh.groupby('Наименование товара', as_index=False)['Остаток'].sum()
 
                     df_combined['Сырьё_lower'] = df_combined['Сырьё'].astype(str).str.strip().str.lower()
-                    df_combined = pd.merge(df_combined, df_wh, left_on='Сырьё_lower', right_on='Наименование товара',
-                                           how='left')
+                    df_combined = pd.merge(df_combined, df_wh, left_on='Сырьё_lower', right_on='Наименование товара', how='left')
                     df_combined['Складской остаток'] = df_combined['Остаток'].fillna(0)
                     df_combined = df_combined.drop(columns=['Сырьё_lower', 'Наименование товара', 'Остаток'])
                 except Exception as e:
@@ -186,13 +213,16 @@ if st.button("🚀 Рассчитать заказ", type="primary"):
                 'missing': missing_in_supplier,
                 'unavailable': unavailable
             }
-            st.success("Расчет готов!")
-            st.rerun() # Перезапускаем интерфейс, чтобы скрыть маскота
+            st.rerun() # Скрываем маскота и обновляем экран
 
+# ==========================================
+# ВЫВОД РЕЗУЛЬТАТОВ
+# ==========================================
 if st.session_state['calculated_data'] is not None:
     data = st.session_state['calculated_data']
     df_final = data['df_final']
 
+    st.success("Расчет готов!")
     st.write("### 🚨 Проверка рисков")
     if not data['missing'].empty:
         st.warning(f"Внимание: {len(data['missing'])} позиций заказа не найдены в бланке поставщика!")
@@ -252,6 +282,7 @@ if st.session_state['calculated_data'] is not None:
             if vol > limit:
                 st.error(f"⚠️ Превышение лимита контейнера {c_type}!")
 
+    # СКАЧИВАНИЕ EXCEL
     df_export = edited_df[['Код DDI', 'Коробок к заказу', 'Наименование']].copy()
     df_export.columns = ['Код товара', 'Количество', 'Название товара (не обязательно)']
     df_export = df_export[df_export['Количество'] > 0]
