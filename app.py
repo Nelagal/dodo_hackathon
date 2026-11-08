@@ -12,6 +12,7 @@ from openpyxl.styles import Font, Alignment
 page_icon = "logo.png" if os.path.exists("logo.png") else "🍕"
 st.set_page_config(page_title="Сборка заказа Додо", page_icon=page_icon, layout="wide")
 
+
 def add_bg_from_local(image_file):
     if os.path.exists(image_file):
         with open(image_file, "rb") as image:
@@ -25,17 +26,19 @@ def add_bg_from_local(image_file):
                 background-position: center;
                 background-attachment: fixed;
             }}
+            /* Исправили отступы, чтобы шапка не улетала и не обрезалась */
             .block-container {{
                 background-color: rgba(255, 255, 255, 0.92);
                 border-radius: 20px;
-                padding: 2rem;
-                margin-top: 2rem;
+                padding: 1.5rem 2rem 2rem 2rem;
+                margin-top: 1rem;
                 box-shadow: 0 8px 16px rgba(0,0,0,0.1);
             }}
             </style>
             """,
             unsafe_allow_html=True
         )
+
 
 add_bg_from_local("background.png")
 
@@ -59,31 +62,24 @@ if 'calculated_data' not in st.session_state:
 # МАСКОТ С ОБЛАЧКОМ (ПОКАЗЫВАЕТСЯ, ЕСЛИ НЕТ РАСЧЕТА)
 # ==========================================
 if st.session_state['calculated_data'] is None:
-    if os.path.exists("mascot.png"):
-        with open("mascot.png", "rb") as img_file:
-            img_base64 = base64.b64encode(img_file.read()).decode()
+    # Создаем три колонки, чтобы центрировать маскота с облачком
+    col_empty1, col_mascot, col_empty2 = st.columns([1, 3, 1])
 
-        st.markdown(f"""
-        <div style="display: flex; align-items: center; justify-content: center; gap: 30px; margin-top: 20px; margin-bottom: 40px; flex-wrap: wrap;">
-            <!-- Додозаврик -->
-            <div>
-                <img src="data:image/png;base64,{img_base64}" width="220" style="filter: drop-shadow(0px 10px 15px rgba(0,0,0,0.1));">
-            </div>
-            <!-- Облачко с текстом -->
-            <div style="position: relative; background: #ffffff; border: 3px solid #E8502A; border-radius: 25px; padding: 25px 35px; box-shadow: 0 10px 20px rgba(232, 80, 42, 0.15); max-width: 500px;">
-                <!-- Хвостик облачка -->
-                <div style="position: absolute; left: -17px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 15px solid transparent; border-bottom: 15px solid transparent; border-right: 17px solid #E8502A;"></div>
-                <div style="position: absolute; left: -12px; top: 50%; transform: translateY(-50%); width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-right: 14px solid #ffffff;"></div>
-                <!-- Текст -->
-                <h3 style="margin: 0 0 10px 0; color: #E8502A; font-family: sans-serif; font-size: 24px;">Готовы собрать идеальный заказ?</h3>
-                <p style="margin: 0; color: #333333; font-family: sans-serif; font-size: 18px;">Загрузите 7 файлов в блоки ниже, чтобы начать расчет.</p>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.write("---")
-    else:
-        st.markdown("<h4 style='text-align: center; color: #E8502A;'>Готовы собрать идеальный заказ?</h4>", unsafe_allow_html=True)
-        st.write("---")
+    with col_mascot:
+        # Делим центральную колонку на картинку и текст
+        c_img, c_text = st.columns([1, 2])
+
+        with c_img:
+            if os.path.exists("mascot.png"):
+                # Используем нативный метод st.image
+                st.image("mascot.png", use_container_width=True)
+
+        with c_text:
+            # Записываем HTML в одну строку без отступов, чтобы Streamlit его отрисовал
+            bubble_html = """<div style="background: white; border: 3px solid #E8502A; border-radius: 20px; padding: 20px 30px; box-shadow: 0 8px 16px rgba(232, 80, 42, 0.15); margin-top: 20px; position: relative;"><div style="position: absolute; left: -17px; top: 40px; width: 0; height: 0; border-top: 15px solid transparent; border-bottom: 15px solid transparent; border-right: 17px solid #E8502A;"></div><div style="position: absolute; left: -12px; top: 43px; width: 0; height: 0; border-top: 12px solid transparent; border-bottom: 12px solid transparent; border-right: 14px solid white;"></div><h3 style="margin: 0 0 10px 0; color: #E8502A; font-family: sans-serif; font-size: 22px;">Готовы собрать идеальный заказ?</h3><p style="margin: 0; color: #333333; font-family: sans-serif; font-size: 16px;">Загрузите 7 файлов в блоки ниже, чтобы начать расчет.</p></div>"""
+            st.markdown(bubble_html, unsafe_allow_html=True)
+
+    st.write("")  # Небольшой отступ перед загрузкой файлов
 
 # ==========================================
 # ЗАГРУЗКА ФАЙЛОВ
@@ -156,27 +152,33 @@ if st.button("🚀 Рассчитать заказ", type="primary"):
                     df_wh = df_wh.groupby('Наименование товара', as_index=False)['Остаток'].sum()
 
                     df_combined['Сырьё_lower'] = df_combined['Сырьё'].astype(str).str.strip().str.lower()
-                    df_combined = pd.merge(df_combined, df_wh, left_on='Сырьё_lower', right_on='Наименование товара', how='left')
+                    df_combined = pd.merge(df_combined, df_wh, left_on='Сырьё_lower', right_on='Наименование товара',
+                                           how='left')
                     df_combined['Складской остаток'] = df_combined['Остаток'].fillna(0)
                     df_combined = df_combined.drop(columns=['Сырьё_lower', 'Наименование товара', 'Остаток'])
                 except Exception as e:
                     st.warning(f"Не удалось прочитать файл складских остатков: {e}")
 
-            df_combined['Отрицательный остаток'] = (df_combined['Текущий остаток'] < 0) | (df_combined['Складской остаток'] < 0)
-            df_combined['Расхождение источников'] = (df_combined['Текущий остаток'] != df_combined['Складской остаток']) & (df_combined['Складской остаток'] != 0)
+            df_combined['Отрицательный остаток'] = (df_combined['Текущий остаток'] < 0) | (
+                        df_combined['Складской остаток'] < 0)
+            df_combined['Расхождение источников'] = (df_combined['Текущий остаток'] != df_combined[
+                'Складской остаток']) & (df_combined['Складской остаток'] != 0)
 
             df_combined['Текущий остаток'] = df_combined['Текущий остаток'].clip(lower=0)
-            df_combined['Чистая потребность'] = (df_combined['Надо заказать'] - df_combined['Текущий остаток']).apply(lambda x: max(0, x))
+            df_combined['Чистая потребность'] = (df_combined['Надо заказать'] - df_combined['Текущий остаток']).apply(
+                lambda x: max(0, x))
             df_combined = df_combined[df_combined['Чистая потребность'] > 0]
 
             # 4. СВЯЗЬ С БЛАНКОМ
             df_supplier['Товар №'] = df_supplier['Товар №'].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
 
-            sup_map_1 = df_supplier[['Код товара поставщика', 'Наименование', 'All', 'Зона хранения', 'Объем ЕИ отгрузки']].copy()
+            sup_map_1 = df_supplier[
+                ['Код товара поставщика', 'Наименование', 'All', 'Зона хранения', 'Объем ЕИ отгрузки']].copy()
             sup_map_1['Официальный_код'] = sup_map_1['Код товара поставщика']
             sup_map_1 = sup_map_1.rename(columns={'Код товара поставщика': 'Код тары'})
 
-            sup_map_2 = df_supplier[['Товар №', 'Наименование', 'All', 'Зона хранения', 'Объем ЕИ отгрузки', 'Код товара поставщика']].copy()
+            sup_map_2 = df_supplier[['Товар №', 'Наименование', 'All', 'Зона хранения', 'Объем ЕИ отгрузки',
+                                     'Код товара поставщика']].copy()
             sup_map_2 = sup_map_2.rename(columns={'Товар №': 'Код тары', 'Код товара поставщика': 'Официальный_код'})
 
             supplier_map = pd.concat([sup_map_1, sup_map_2], ignore_index=True).dropna(subset=['Код тары'])
@@ -191,8 +193,10 @@ if st.button("🚀 Рассчитать заказ", type="primary"):
 
             # 5. РАСЧЕТ
             df_final['Вместимость'] = pd.to_numeric(df_final['Вместимость'], errors='coerce').fillna(1)
-            df_final['Коробок к заказу'] = df_final.apply(lambda row: math.ceil(row['Чистая потребность'] / row['Вместимость']), axis=1)
+            df_final['Коробок к заказу'] = df_final.apply(
+                lambda row: math.ceil(row['Чистая потребность'] / row['Вместимость']), axis=1)
             df_final['Объем ЕИ отгрузки'] = pd.to_numeric(df_final['Объем ЕИ отгрузки'], errors='coerce').fillna(0)
+
 
             # 6. ПРОВЕРКА
             def check_row(row):
@@ -202,6 +206,7 @@ if st.button("🚀 Рассчитать заказ", type="primary"):
                 if row['Коробок к заказу'] > 100: reasons.append("⚠️ Большой объем")
                 if row['Вместимость'] == 1: reasons.append("⚠️ Нет фасовки")
                 return " | ".join(reasons) if reasons else "✅ ОК"
+
 
             df_final['Проверка'] = df_final.apply(check_row, axis=1)
 
@@ -213,7 +218,7 @@ if st.button("🚀 Рассчитать заказ", type="primary"):
                 'missing': missing_in_supplier,
                 'unavailable': unavailable
             }
-            st.rerun() # Скрываем маскота и обновляем экран
+            st.rerun()  # Скрываем маскота и обновляем экран
 
 # ==========================================
 # ВЫВОД РЕЗУЛЬТАТОВ
@@ -238,9 +243,12 @@ if st.session_state['calculated_data'] is not None:
     tab1, tab2 = st.tabs(["Общий список", "Загрузка контейнеров"])
 
     with tab1:
-        st.info("💡 Дважды кликните на 'Коробок к заказу', чтобы изменить вручную. Позиции со статусом ⚠️ требуют внимания.")
+        st.info(
+            "💡 Дважды кликните на 'Коробок к заказу', чтобы изменить вручную. Позиции со статусом ⚠️ требуют внимания.")
 
-        df_display = df_final[['Код DDI', 'Наименование', 'Нужно (шт/кг)', 'Фасовка', 'Коробок к заказу', 'Складской остаток', 'Проверка']].sort_values('Наименование')
+        df_display = df_final[
+            ['Код DDI', 'Наименование', 'Нужно (шт/кг)', 'Фасовка', 'Коробок к заказу', 'Складской остаток',
+             'Проверка']].sort_values('Наименование')
 
         edited_df = st.data_editor(
             df_display,
@@ -251,7 +259,8 @@ if st.session_state['calculated_data'] is not None:
                 "Наименование": st.column_config.TextColumn("Наименование", width="large"),
                 "Нужно (шт/кг)": st.column_config.NumberColumn("Нужно (шт/кг)", width="small", format="%.2f"),
                 "Фасовка": st.column_config.NumberColumn("Фасовка", width="small"),
-                "Коробок к заказу": st.column_config.NumberColumn("Коробок к заказу", min_value=0, step=1, width="small"),
+                "Коробок к заказу": st.column_config.NumberColumn("Коробок к заказу", min_value=0, step=1,
+                                                                  width="small"),
                 "Складской остаток": st.column_config.NumberColumn("Склад (сверка)", width="small"),
                 "Проверка": st.column_config.TextColumn("Проверка", width="large")
             },
@@ -261,8 +270,10 @@ if st.session_state['calculated_data'] is not None:
     with tab2:
         df_final_edited = df_final.copy()
         for idx, row in edited_df.iterrows():
-            if row['Коробок к заказу'] != df_final_edited.loc[df_final_edited['Код DDI'] == row['Код DDI'], 'Коробок к заказу'].values[0]:
-                df_final_edited.loc[df_final_edited['Код DDI'] == row['Код DDI'], 'Коробок к заказу'] = row['Коробок к заказу']
+            if row['Коробок к заказу'] != \
+                    df_final_edited.loc[df_final_edited['Код DDI'] == row['Код DDI'], 'Коробок к заказу'].values[0]:
+                df_final_edited.loc[df_final_edited['Код DDI'] == row['Код DDI'], 'Коробок к заказу'] = row[
+                    'Коробок к заказу']
 
         df_containers = df_final_edited.groupby('Зона хранения').agg({
             'Коробок к заказу': 'sum',
